@@ -204,16 +204,17 @@ int main() {
 	     // brightness *= brightness;	     brightness *= brightness;	     brightness *= brightness;
 	     // brightness = 1.0 - brightness;
 	     // gl_FragColor = vec4(0.0, 0.5, brightness, brightness);
-	     float brightness = length(gl_FragCoord.xy - resolution / 2.0) / length(resolution);
+	     float brightness = 1.0 - length(gl_FragCoord.xy - resolution / 2.0) / length(resolution);
 	     brightness = 1.0 - brightness;
 	     gl_FragColor = vec4(0.0, 0.0, brightness, brightness);
 
 	     float radius = length(pointer - gl_FragCoord.xy);
-	     float touchMark = smoothstep(16.0,
-					  40.0,
-					  radius);
+	     float touchMark = 1.0 - smoothstep(16.0,
+						40.0,
+						radius);
 
-	     gl_FragColor *= touchMark;
+	     gl_FragColor = vec4(gl_FragColor.xyz, gl_FragColor.w + touchMark);
+	     //gl_FragColor *= touchMark;
 	   }
 
 	   );
