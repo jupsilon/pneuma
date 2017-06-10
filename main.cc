@@ -89,8 +89,8 @@ int main() {
     auto egl_display_ptr = attach_unique(eglGetDisplay(display_ptr.get()), eglTerminate);
     eglInitialize(egl_display_ptr.get(), nullptr, nullptr);
 
-    resolution_vec[0] = 273;
-    resolution_vec[1] = 182;
+    resolution_vec[0] = 1500;
+    resolution_vec[1] = 1000;
     auto egl_window_ptr = attach_unique(wl_egl_window_create(surface_ptr.get(), resolution_vec[0], resolution_vec[1]),
 					wl_egl_window_destroy);
 
@@ -208,10 +208,14 @@ int main() {
 	     brightness = 1.0 - brightness;
 	     gl_FragColor = vec4(0.0, 0.0, brightness, brightness);
 
-	     if (32.0 > length(pointer - gl_FragCoord.xy)) {
-	       gl_FragColor = vec4(1.0);
-	     }
+	     float radius = length(pointer - gl_FragCoord.xy);
+	     float touchMark = smoothstep(16.0,
+					  40.0,
+					  radius);
+
+	     gl_FragColor *= touchMark;
 	   }
+
 	   );
 
     auto compile = [](auto id, auto code) {
