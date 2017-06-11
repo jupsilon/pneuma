@@ -32,13 +32,13 @@ inline uint32_t     version  (registry_bind_args const& args) { return std::get<
 
 #define CODE(x) (#x)
 
-auto wl_registry_add_listener(wl_registry* registry, wl_registry_listener&& listener, void* data) {
+inline auto wl_registry_add_listener(wl_registry* registry, wl_registry_listener&& listener, void* data) {
   return  wl_registry_add_listener(registry, &listener, data);
 }
-auto wl_shell_surface_add_listener(wl_shell_surface* shell_surface, wl_shell_surface_listener&& listener, void* data) {
+inline auto wl_shell_surface_add_listener(wl_shell_surface* shell_surface, wl_shell_surface_listener&& listener, void* data) {
   return wl_shell_surface_add_listener(shell_surface, &listener, data);
 }
-auto wl_seat_add_listener(wl_seat* seat, wl_seat_listener&& listener, void* data) {
+inline auto wl_seat_add_listener(wl_seat* seat, wl_seat_listener&& listener, void* data) {
   return wl_seat_add_listener(seat, &listener, data);
 }
 
@@ -61,19 +61,9 @@ auto registry_bind_iter = [](wl_display* display) {
 
 int main() {
   static GLfloat resolution_vec[] = { 1500.0f, 1000.0f, };
+  static GLfloat pointer_vec[2] = { -256, -256 };
 
   try {
-    {
-      using continuation = void (*)(void);
-      std::vector<continuation> buf;
-
-      buf.push_back([]() { std::cerr << 'a' << std::endl; });
-      buf.push_back((continuation)std::printf);
-
-      buf[0]();
-      reinterpret_cast<void(*)(char const*)>(buf[1])("hi.\n");
-    }
-
     auto display_ptr = attach_unique(wl_display_connect(nullptr), wl_display_disconnect);
 
     std::unique_ptr<wl_compositor, decltype(&wl_compositor_destroy)> compositor_ptr(nullptr, wl_compositor_destroy);
@@ -111,7 +101,9 @@ int main() {
 				      wl_shell_surface_pong(shell_surface, serial);
 				    },
 				    .configure = [](void* data, wl_shell_surface* shell_surface, uint32_t edges, int32_t width, int32_t height) {
-				    wl_egl_window_resize(reinterpret_cast<wl_egl_window*>(data), width, height, 0, 0);
+				      resolution_vec[0] = width;
+				      resolution_vec[1] = height;
+				      wl_egl_window_resize(reinterpret_cast<wl_egl_window*>(data), width, height, 0, 0);
 				    },
 				    .popup_done = [](void* data, wl_shell_surface* shell_surface) {
 				    }
@@ -136,7 +128,6 @@ int main() {
 			   },
 			 }, nullptr);
 
-    static GLfloat pointer_vec[2] = { -256, -256 };
     auto pointer_ptr = attach_unique(wl_seat_get_pointer(seat_ptr.get()), wl_pointer_destroy);
     wl_pointer_listener pointer_listener = {
       [](void* data, wl_pointer* pointer, uint32_t serial, wl_surface* surface, wl_fixed_t sx, wl_fixed_t sy) {
@@ -210,13 +201,43 @@ int main() {
 	   uniform vec2 pointer;
 
 	   void main(void) {
-	     // float brightness = length(gl_FragCoord.xy - resolution * (vert / 0.5 + vec2(0.5))) / length(resolution);
-	     // brightness *= brightness;	     brightness *= brightness;	     brightness *= brightness;
-	     // brightness = 1.0 - brightness;
-	     // gl_FragColor = vec4(0.0, 0.5, brightness, brightness);
-	     float brightness = 1.0 - length(gl_FragCoord.xy - resolution / 2.0) / length(resolution);
-	     brightness = 1.0 - brightness;
-	     gl_FragColor = vec4(0.0, 0.0, brightness, brightness);
+	     
+	     if (gl_FragCoord.x < 8.0) {
+	       float brightness = (8.0 - gl_FragCoord.x) / 8.0;
+	       gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	       if (gl_FragCoord.y < 8.0) {
+		 brightness = max(brightness, (8.0 - gl_FragCoord.y) / 8.0);
+		 gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	       }
+	       else if (resolution.y - 8.0 < gl_FragCoord.y) {
+		 brightness = max(brightness, (gl_FragCoord.y + 8.0 - resolution.y) / 8.0);
+		 gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	       }
+	     }
+	     else if (resolution.x - 8.0 < gl_FragCoord.x) {
+	       float brightness = (gl_FragCoord.x + 8.0 - resolution.x) / 8.0;
+	       gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	       if (gl_FragCoord.y < 8.0) {
+		 brightness = max(brightness, (8.0 - gl_FragCoord.y) / 8.0);
+		 gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	       }
+	       else if (resolution.y - 8.0 < gl_FragCoord.y) {
+		 brightness = max(brightness, (gl_FragCoord.y + 8.0 - resolution.y) / 8.0);
+		 gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	       }
+	     }
+	     else if (gl_FragCoord.y < 8.0) {
+	       float brightness = (8.0 - gl_FragCoord.y) / 8.0;
+	       gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	     }
+	     else if (resolution.y - 8.0 < gl_FragCoord.y) {
+	       float brightness = (gl_FragCoord.y + 8.0 - resolution.y) / 8.0;
+	       gl_FragColor = vec4(brightness, brightness, brightness, 1.0);
+	     }
+	     else {
+	       float brightness = length(gl_FragCoord.xy - resolution / 2.0) / length(resolution);
+	       gl_FragColor = vec4(0.0, 0.0, brightness, brightness);
+	     }
 
 	     float radius = length(pointer - gl_FragCoord.xy);
 	     float touchMark = 1.0 - smoothstep(28.0,
