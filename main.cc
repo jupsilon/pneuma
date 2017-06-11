@@ -22,6 +22,8 @@ using coroutine = boost::coroutines2::coroutine<T>;
 template <typename T, typename D>
 inline auto attach_unique(T* ptr, D deleter) {
   std::cerr << typeid (T*).name() << ':' << ptr << std::endl;
+  if (ptr == nullptr)
+    throw std::runtime_error("bad pointer value");
   return std::unique_ptr<T, D>(ptr, deleter);
 }
 
@@ -33,26 +35,34 @@ inline uint32_t     version  (registry_bind_args const& args) { return std::get<
 
 #define CODE(x) (#x)
 
+struct unwind_protect {
+  template <typename Body, typename Cleanup>
+  unwind_protect(Body body, Cleanup cleanup) {
+  }
+  ~unwind_protect() {
+  }
+};
+
+auto wl_registry_add_listener(wl_registry* registry, wl_registry_listener&& listener, void* data) {
+  auto ret =  wl_registry_add_listener(registry, &listener, data);
+  std::cerr << "registry added: " << ret << std::endl;
+  return ret;
+}
+
 auto registry_bind_iter = [](wl_display* display) {
   return coroutine<registry_bind_args>::pull_type([display](auto& yield) {
       auto registry_ptr = attach_unique(wl_display_get_registry(display), wl_registry_destroy);
-      wl_registry_listener listener = {
-	[](void* data,
-	   wl_registry* registry,
-	   uint32_t id,
-	   char const* interface,
-	   uint32_t version)
-	{
-	  auto& yield = *reinterpret_cast<coroutine<registry_bind_args>::push_type*>(data);
-	  yield(registry_bind_args(registry, id, interface, version));
+      wl_registry_add_listener(registry_ptr.get(), {
+	  [](void* data, wl_registry* registry, uint32_t id, char const* interface, uint32_t version)
+	    {
+	      auto& yield = *reinterpret_cast<coroutine<registry_bind_args>::push_type*>(data);
+	      yield(registry_bind_args(registry, id, interface, version));
+	    },
+	    [](void* data, wl_registry* registry, uint32_t id) {
+	    }
 	},
-	[](void* data,
-	   wl_registry* registry,
-	   uint32_t id)
-	{
-	},
-      };
-      wl_registry_add_listener(registry_ptr.get(), &listener, &yield);
+	&yield);
+
       wl_display_roundtrip(display);
     });
 };
@@ -209,8 +219,8 @@ int main() {
 	     gl_FragColor = vec4(0.0, 0.0, brightness, brightness);
 
 	     float radius = length(pointer - gl_FragCoord.xy);
-	     float touchMark = 1.0 - smoothstep(16.0,
-						40.0,
+	     float touchMark = 1.0 - smoothstep(28.0,
+						36.0,
 						radius);
 
 	     gl_FragColor = vec4(gl_FragColor.xyz, gl_FragColor.w + touchMark);
