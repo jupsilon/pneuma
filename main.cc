@@ -4,10 +4,12 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <tuple>
+#include <complex>
 
 #include <cstring>
 
-#include <boost/coroutine2/all.hpp>
+//#include <boost/coroutine2/all.hpp>
 
 #include <wayland-client.h>
 #include <wayland-egl.h>
@@ -15,20 +17,14 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 
-template <typename T>
-using coroutine = boost::coroutines2::coroutine<T>;
+//template <typename T>
+//using coroutine = boost::coroutines2::coroutine<T>;
 
 template <typename T, typename D>
 inline auto attach_unique(T* ptr, D deleter) {
   std::cerr << typeid (T*).name() << ':' << ptr << std::endl;
   return std::unique_ptr<T, D>(ptr, deleter);
 }
-
-using registry_bind_args = std::tuple<wl_registry*, uint32_t, char const*, uint32_t>;
-inline wl_registry* registry (registry_bind_args const& args) { return std::get<0>(args); }
-inline uint32_t     id       (registry_bind_args const& args) { return std::get<1>(args); }
-inline char const*  interface(registry_bind_args const& args) { return std::get<2>(args); }
-inline uint32_t     version  (registry_bind_args const& args) { return std::get<3>(args); }
 
 #define CODE(x) (#x)
 
@@ -42,47 +38,91 @@ inline auto wl_seat_add_listener(wl_seat* seat, wl_seat_listener&& listener, voi
   return wl_seat_add_listener(seat, &listener, data);
 }
 
-auto registry_bind_iter = [](wl_display* display) {
-  return coroutine<registry_bind_args>::pull_type([display](auto& yield) {
-      auto registry_ptr = attach_unique(wl_display_get_registry(display), wl_registry_destroy);
-      wl_registry_add_listener(registry_ptr.get(),
-			       wl_registry_listener {
-				 .global = [](void* data, wl_registry* registry, uint32_t id, char const* interface, uint32_t version) {
-				   auto& yield = *reinterpret_cast<coroutine<registry_bind_args>::push_type*>(data);
-				   yield(registry_bind_args(registry, id, interface, version));
-				 },
-				 .global_remove = [](void* data, wl_registry* registry, uint32_t id) {
-				 }
-			       },
-			       &yield);
-      wl_display_roundtrip(display);
-    });
-};
+// using registry_bind_args = std::tuple<wl_registry*, uint32_t, char const*, uint32_t>;
+// inline wl_registry* registry (registry_bind_args const& args) { return std::get<0>(args); }
+// inline uint32_t     id       (registry_bind_args const& args) { return std::get<1>(args); }
+// inline char const*  interface(registry_bind_args const& args) { return std::get<2>(args); }
+// inline uint32_t     version  (registry_bind_args const& args) { return std::get<3>(args); }
+// auto registry_bind_iter = [](wl_display* display) {
+//   return coroutine<registry_bind_args>::pull_type([display](auto& yield) {
+//       auto registry_ptr = attach_unique(wl_display_get_registry(display), wl_registry_destroy);
+//       wl_registry_add_listener(registry_ptr.get(),
+// 			       wl_registry_listener {
+// 				 .global = [](void* data, wl_registry* registry, uint32_t id, char const* interface, uint32_t version) {
+// 				   auto& yield = *reinterpret_cast<coroutine<registry_bind_args>::push_type*>(data);
+// 				   yield(registry_bind_args(registry, id, interface, version));
+// 				 },
+// 				 .global_remove = [](void* data, wl_registry* registry, uint32_t id) {
+// 				 }
+// 			       },
+// 			       &yield);
+//       wl_display_roundtrip(display);
+//     });
+// };
 
 int main() {
-  static GLfloat resolution_vec[] = { 1500.0f, 1000.0f, };
+  static GLfloat resolution_vec[] = { 300.0f, 200.0f, };
   static GLfloat pointer_vec[2] = { -256, -256 };
+  static std::complex<GLfloat> touches[10] = {
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+    { -256.0f, -256.0f, },
+  };
 
   try {
     auto display_ptr = attach_unique(wl_display_connect(nullptr), wl_display_disconnect);
 
-    std::unique_ptr<wl_compositor, decltype(&wl_compositor_destroy)> compositor_ptr(nullptr, wl_compositor_destroy);
-    std::unique_ptr<wl_shell, decltype(&wl_shell_destroy)> shell_ptr(nullptr, wl_shell_destroy);
-    std::unique_ptr<wl_seat, decltype(&wl_seat_destroy)> seat_ptr(nullptr, wl_seat_destroy);
+    // std::unique_ptr<wl_compositor, decltype(&wl_compositor_destroy)> compositor_ptr(nullptr, wl_compositor_destroy);
+    // std::unique_ptr<wl_shell, decltype(&wl_shell_destroy)> shell_ptr(nullptr, wl_shell_destroy);
+    // std::unique_ptr<wl_seat, decltype(&wl_seat_destroy)> seat_ptr(nullptr, wl_seat_destroy);
+    // for (auto args : registry_bind_iter(display_ptr.get())) {
+    //   if      (0 == std::strcmp(wl_compositor_interface.name, interface(args))) {
+    // 	auto compositor_raw = wl_registry_bind(registry(args), id(args), &wl_compositor_interface, 0);
+    // 	compositor_ptr = attach_unique((wl_compositor*) compositor_raw, wl_compositor_destroy);	
+    //   }
+    //   else if (0 == std::strcmp(wl_shell_interface.name, interface(args))) {
+    // 	auto shell_raw = wl_registry_bind(registry(args), id(args), &wl_shell_interface, 0);
+    // 	shell_ptr = attach_unique((wl_shell*) shell_raw, wl_shell_destroy);
+    //   }
+    //   else if (0 == std::strcmp(wl_seat_interface.name, interface(args))) {
+    // 	auto seat_raw = wl_registry_bind(registry(args), id(args), &wl_seat_interface, 0);
+    // 	seat_ptr = attach_unique((wl_seat*) seat_raw, wl_seat_destroy);
+    //   }
+    // }
 
-    for (auto args : registry_bind_iter(display_ptr.get())) {
-      if      (0 == std::strcmp(wl_compositor_interface.name, interface(args))) {
-	auto compositor_raw = wl_registry_bind(registry(args), id(args), &wl_compositor_interface, 0);
-	compositor_ptr = attach_unique((wl_compositor*) compositor_raw, wl_compositor_destroy);	
-      }
-      else if (0 == std::strcmp(wl_shell_interface.name, interface(args))) {
-	auto shell_raw = wl_registry_bind(registry(args), id(args), &wl_shell_interface, 0);
-	shell_ptr = attach_unique((wl_shell*) shell_raw, wl_shell_destroy);
-      }
-      else if (0 == std::strcmp(wl_seat_interface.name, interface(args))) {
-	auto seat_raw = wl_registry_bind(registry(args), id(args), &wl_seat_interface, 0);
-	seat_ptr = attach_unique((wl_seat*) seat_raw, wl_seat_destroy);
-      }
+    static std::unique_ptr<wl_compositor, decltype(&wl_compositor_destroy)> compositor_ptr(nullptr, wl_compositor_destroy);
+    static std::unique_ptr<wl_shell, decltype(&wl_shell_destroy)> shell_ptr(nullptr, wl_shell_destroy);
+    static std::unique_ptr<wl_seat, decltype(&wl_seat_destroy)> seat_ptr(nullptr, wl_seat_destroy);
+    {
+      auto registry_ptr = attach_unique(wl_display_get_registry(display_ptr.get()), wl_registry_destroy); // keep until round tripping
+      wl_registry_add_listener(registry_ptr.get(),
+			       wl_registry_listener {
+				 .global = [](void* data, wl_registry* registry, uint32_t id, char const* interface, uint32_t version) {
+				   if      (0 == std::strcmp(wl_compositor_interface.name, interface)) {
+				     auto compositor_raw = wl_registry_bind(registry, id, &wl_compositor_interface, 3);
+				     compositor_ptr = attach_unique((wl_compositor*) compositor_raw, wl_compositor_destroy);	
+				   }
+				   else if (0 == std::strcmp(wl_shell_interface.name, interface)) {
+				     auto shell_raw = wl_registry_bind(registry, id, &wl_shell_interface, 1);
+				     shell_ptr = attach_unique((wl_shell*) shell_raw, wl_shell_destroy);
+				   }
+				   else if (0 == std::strcmp(wl_seat_interface.name, interface)) {
+				     auto seat_raw = wl_registry_bind(registry, id, &wl_seat_interface, 1);
+				     seat_ptr = attach_unique((wl_seat*) seat_raw, wl_seat_destroy);
+				   }
+				 },
+				 .global_remove = [](void* data, wl_registry* registry, uint32_t id) {
+				 }
+			       },
+			       nullptr);
+      wl_display_roundtrip(display_ptr.get());
     }
 
     auto surface_ptr = attach_unique(wl_compositor_create_surface(compositor_ptr.get()),
@@ -104,6 +144,7 @@ int main() {
 				      resolution_vec[0] = width;
 				      resolution_vec[1] = height;
 				      wl_egl_window_resize(reinterpret_cast<wl_egl_window*>(data), width, height, 0, 0);
+				      glViewport(0, 0, (int) width, (int) height);
 				    },
 				    .popup_done = [](void* data, wl_shell_surface* shell_surface) {
 				    }
@@ -128,6 +169,8 @@ int main() {
 			   },
 			 }, nullptr);
 
+    static uint32_t button_state = 0;
+
     auto pointer_ptr = attach_unique(wl_seat_get_pointer(seat_ptr.get()), wl_pointer_destroy);
     wl_pointer_listener pointer_listener = {
       [](void* data, wl_pointer* pointer, uint32_t serial, wl_surface* surface, wl_fixed_t sx, wl_fixed_t sy) {
@@ -138,10 +181,17 @@ int main() {
       },
       [](void* data, wl_pointer* pointer, uint32_t time, wl_fixed_t sx, wl_fixed_t sy) {
 	std::cerr << "Pointer moved: " << sx << ',' << sy << std::endl;
-	pointer_vec[0] = sx / 256.0f;
-	pointer_vec[1] = resolution_vec[1] - sy / 256.0f;
+	if (button_state) {
+	  pointer_vec[0] = sx / 256.0f;
+	  pointer_vec[1] = resolution_vec[1] - sy / 256.0f;
+	}
+	else {
+	  pointer_vec[0] = -100.0f;
+	  pointer_vec[1] = -100.0f;
+	}
       },
       [](void* data, wl_pointer* pointer, uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
+	button_state = state;
 	std::cerr << "Pointer button." << std::endl;
       },
       [](void* data, wl_pointer* pointer, uint32_t time, uint32_t axis, wl_fixed_t value) {
@@ -149,6 +199,27 @@ int main() {
       }
     };
     wl_pointer_add_listener(pointer_ptr.get(), &pointer_listener, nullptr);
+
+    auto touch_ptr = attach_unique(wl_seat_get_touch(seat_ptr.get()), wl_touch_destroy);
+    if (touch_ptr) {
+      wl_touch_listener touch_listener = {
+	.down = [](void*, wl_touch*, uint32_t, uint32_t, wl_surface*, int32_t id, wl_fixed_t x, wl_fixed_t y) {
+	},
+	.up = [](void*, wl_touch*, uint32_t, uint32_t, int32_t id) {
+	  touches[id] = { -256.0, -256.0 };
+	},
+	.motion = [](void* data, wl_touch* touch, uint32_t time, int32_t id, wl_fixed_t x, wl_fixed_t y) {
+	  touches[id].real(x / 256.0f);
+	  touches[id].imag(resolution_vec[1] - y / 256.0f);
+	  std::cerr << id << ':' << touches[id] << std::endl;
+	},
+	.frame = [](void*, wl_touch*) {
+	},
+	.cancel = [](void*, wl_touch*) {
+	},
+      };
+      wl_touch_add_listener(touch_ptr.get(), &touch_listener, nullptr);
+    }
 
     eglBindAPI(EGL_OPENGL_ES_API);
     EGLint attributes[] = {
@@ -199,6 +270,7 @@ int main() {
 	   varying vec2 vert;
 	   uniform vec2 resolution;
 	   uniform vec2 pointer;
+	   uniform vec2 touches[10];
 
 	   void main(void) {
 	     
@@ -240,12 +312,16 @@ int main() {
 	     }
 
 	     float radius = length(pointer - gl_FragCoord.xy);
-	     float touchMark = 1.0 - smoothstep(28.0,
-						36.0,
-						radius);
+	     float touchMark = exp(-(radius-32.0) * (radius-32.0) / 8.0);
+	     gl_FragColor += vec4(touchMark, touchMark, touchMark, touchMark + 0.3);
+	     // gl_FragColor = 0.7 * gl_FragColor;
+	     // gl_FragColor += vec4(0.3, 0.3, 0.3, 0.7* touchMark);
 
-	     gl_FragColor = vec4(gl_FragColor.xyz, gl_FragColor.w + touchMark);
-	     //gl_FragColor *= touchMark;
+	     for (int i = 0; i < 10; ++i) {
+	       float r = length(touches[i] - gl_FragCoord.xy);
+	       float mark = exp(-(r-32.0) * (r-32.0) / 8.0);
+	       gl_FragColor += vec4(mark, mark, mark, mark);
+	     }
 	   }
 
 	   );
@@ -313,9 +389,9 @@ int main() {
 	+1, -1, 0,
 	-1, -1, 0,
       };
-      //      glUniform2f(resolution, resolution_vec[0], resolution_vec[1]);
       glUniform2fv(glGetUniformLocation(program, "resolution"), 1, resolution_vec);
       glUniform2fv(glGetUniformLocation(program, "pointer"), 1, pointer_vec);
+      glUniform2fv(glGetUniformLocation(program, "touches"), 10, (GLfloat*) touches);
       glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, vVertices);
       glEnableVertexAttribArray(0);
       glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
